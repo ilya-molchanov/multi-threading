@@ -24,29 +24,71 @@ namespace SocketTcpClient
         private static readonly int _port = 8005; // server _port
         private static readonly string _address = "127.0.0.1"; // server _address
 
-        private static List<string> _clientNamesList = new List<string>() {"first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eigth", "nineth", "tenth" };
+        private static List<string> _messagesList = new List<string>() {"first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eigth", "nineth", "tenth" };
 
         static void Main(string[] args)
         {
-            ThreadPool.QueueUserWorkItem(state => ClientSendMessages(Thread.CurrentThread.ManagedThreadId));
-            ThreadPool.QueueUserWorkItem(state => ClientSendMessages(Thread.CurrentThread.ManagedThreadId));
-            ThreadPool.QueueUserWorkItem(state => ClientSendMessages(Thread.CurrentThread.ManagedThreadId));
+            Console.WriteLine("Press ESC to stop");
+           // ThreadPool.QueueUserWorkItem(state => CheckServerAvailability());
+            while (!(Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Escape))
+            {
+                ThreadPool.QueueUserWorkItem(state => ClientSendMessages(Thread.CurrentThread.ManagedThreadId));
+                ThreadPool.QueueUserWorkItem(state => ClientSendMessages(Thread.CurrentThread.ManagedThreadId));
 
-            Console.Read();
+                Thread.Sleep(3000);
+            }
         }
-        
+
+        //private static bool CheckServerAvailability(Socket socket)
+        //{
+        //    bool success = socket.Poll(0, SelectMode.SelectRead);
+            //try
+            //{
+                //IPEndPoint ipPoint = new IPEndPoint(IPAddress.Parse(_address), _port);
+
+                //Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                // connect to the remote host
+                
+                //if (success)
+                //{
+                //    return true;
+                //}
+                //else
+                //{
+                //    return false;
+                //}
+            //}
+            //catch (Exception ex)
+            //{
+            //    Console.WriteLine("2");
+            //    Console.WriteLine(ex.Message);
+            //}
+            //return false;
+        //}
+
         private static async Task ClientSendMessages(int numberClient)
         {
             try
             {
-                for (int i = 0; i < GetRandomNumber(2, 3); i++)
+                for (int i = 0; i < GetRandomNumber(4, 5); i++)
                 {
                     IPEndPoint ipPoint = new IPEndPoint(IPAddress.Parse(_address), _port);
 
                     Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                    
                     // connect to the remote host
                     socket.Connect(ipPoint);
-                    string sendingMessage = _clientNamesList[GetRandomNumber(0, 9)];
+
+                    //var res1 = CheckServerAvailability(socket);
+
+                    //if (!res1)
+                    //{
+                    //    socket.Close();
+                    //    socket.Dispose();
+                    //    return;
+                    //}
+
+                    string sendingMessage = _messagesList[GetRandomNumber(0, 9)];
                     byte[] data = Encoding.Unicode.GetBytes(numberClient + "|" + sendingMessage);
                     socket.Send(data);
 
@@ -76,7 +118,7 @@ namespace SocketTcpClient
             {
                 Console.WriteLine(ex.Message);
             }
-            await Task.Delay(2000);
+            await Task.Delay(1000);
         }
     }
 }

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 
 namespace SocketTcpServer
 {
@@ -30,23 +31,31 @@ namespace SocketTcpServer
 
         private static int port = 8005; // incoming port
 
+
         static void Main(string[] args)
         {
             // get addressess for starting socket
             IPEndPoint ipPoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), port);
-
+            
             // create socket
             Socket listenSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+            // bind socket with local incoming data point
+            listenSocket.Bind(ipPoint);
+
+            // starting listening
+            listenSocket.Listen(10);
+            Console.WriteLine("Server started. Waiting connections...");
+
+            ThreadPool.QueueUserWorkItem(state => ServerReadMessages(listenSocket, ipPoint));
+            Console.ReadKey();
+        }
+
+        private static void ServerReadMessages(Socket listenSocket, IPEndPoint ipPoint)
+        {
             try
             {
-                // bind socket with local incoming data point
-                listenSocket.Bind(ipPoint);
-
-                // starting listening
-                listenSocket.Listen(10);
-                Console.WriteLine("Server started. Waiting connections...");
-
-                while (true)
+                while (!(Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Escape))
                 {
                     Socket handler = listenSocket.Accept();
                     // get message
@@ -82,7 +91,30 @@ namespace SocketTcpServer
             {
                 Console.WriteLine(ex.Message);
             }
-            Console.Read();
+
+            //IHubContext context = GlobalHost.ConnectionManager.GetHubContext<SimpleHub>();
+            //context.Clients.All.showPercent(percent);
+
+
+            //List<string> threadsToNotify = new List<string>();
+
+            //foreach (string key in _history.Keys)
+            //{
+            //    foreach (var innerDictionary in _history[key])
+            //    {
+            //        string currentThread = innerDictionary.Value.Select(x => x.thread).ToString();
+            //        if (!threadsToNotify.Contains(currentThread))
+            //        {
+            //            threadsToNotify.Add(currentThread);
+            //        }
+            //    }
+            //}
+
+            //foreach (string val in threadsToNotify)
+            //{
+            //    sendingData += "thread number : " + sendingThread + " sent message " + innerDictionary.Key + Environment.NewLine;
+            //}
+
         }
 
         private static void SendMessagesToClients(string numberThread, Socket handler)
