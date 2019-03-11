@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace SocketTcpServer
 {
@@ -34,86 +35,78 @@ namespace SocketTcpServer
 
         static void Main(string[] args)
         {
-            // get addressess for starting socket
-            IPEndPoint ipPoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), port);
-            
-            // create socket
-            Socket listenSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            using (Socket listenSocket =
+                new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
+            {
+                using (CancellationTokenSource cts = new CancellationTokenSource())
+                {
 
-            // bind socket with local incoming data point
-            listenSocket.Bind(ipPoint);
+                    var token = cts.Token;
+                    token.Register(() => { Console.WriteLine("Server Cancelled."); });
+                
+                    // get addressess for starting socket
+                    IPEndPoint ipPoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), port);
 
-            // starting listening
-            listenSocket.Listen(10);
-            Console.WriteLine("Server started. Waiting connections...");
+                    // create socket
 
-            ThreadPool.QueueUserWorkItem(state => ServerReadMessages(listenSocket, ipPoint));
+
+                    // bind socket with local incoming data point
+                    listenSocket.Bind(ipPoint);
+
+                    // starting listening
+                    listenSocket.Listen(10);
+
+                    Console.WriteLine("Server started. Waiting connections...");
+
+                    while (!token.IsCancellationRequested)
+                    {
+                        if (Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Escape)
+                            cts.Cancel();
+
+                        Task.Run(() => { ServerReadMessages(listenSocket, token); }, token);
+
+                    }
+                }
+            }
+
             Console.ReadKey();
         }
 
-        private static void ServerReadMessages(Socket listenSocket, IPEndPoint ipPoint)
+        private static void ServerReadMessages(Socket listenSocket, CancellationToken token)
         {
             try
             {
-                while (!(Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Escape))
-                {
-                    Socket handler = listenSocket.Accept();
-                    // get message
-                    StringBuilder builder = new StringBuilder();
-                    int bytes = 0; // bytes count
-                    byte[] data = new byte[10000]; // buffer
-
-                    do
+                    if (token.IsCancellationRequested)
+                        return;
+                    using (Socket handler = listenSocket.Accept())
                     {
-                        bytes = handler.Receive(data);
-                        builder.Append(Encoding.Unicode.GetString(data, 0, bytes));
-                    } while (handler.Available > 0);
+                        // get message
+                        StringBuilder builder = new StringBuilder();
+                        int bytes = 0; // bytes count
+                        byte[] data = new byte[10000]; // buffer
 
-                    String[] transferredArgs = builder.ToString().Split('|');
-                    Console.WriteLine(DateTime.Now.ToLongTimeString() + " thread number : " + transferredArgs[0] +
-                                      " sent message " + transferredArgs[1]);
-                    Dictionary<string, List<InnerSendingThreadsStructure>> helpingDictionary =
-                        new Dictionary<string, List<InnerSendingThreadsStructure>>();
-                    List<InnerSendingThreadsStructure> helpingList = new List<InnerSendingThreadsStructure>();
-                    helpingList.Add(new InnerSendingThreadsStructure(transferredArgs[0], true));
+                        do
+                        {
+                            bytes = handler.Receive(data);
+                            builder.Append(Encoding.Unicode.GetString(data, 0, bytes));
+                        } while (handler.Available > 0 && !token.IsCancellationRequested);
 
-                    helpingDictionary.Add(transferredArgs[1], helpingList);
+                        String[] transferredArgs = builder.ToString().Split('|');
+                        Console.WriteLine(DateTime.Now.ToLongTimeString() + " thread number : " + transferredArgs[0] +
+                                          " sent message " + transferredArgs[1]);
+                        Dictionary<string, List<InnerSendingThreadsStructure>> helpingDictionary =
+                            new Dictionary<string, List<InnerSendingThreadsStructure>>();
+                        List<InnerSendingThreadsStructure> helpingList = new List<InnerSendingThreadsStructure>();
+                        helpingList.Add(new InnerSendingThreadsStructure(transferredArgs[0], true));
 
-                    _history.Add(Guid.NewGuid().ToString(), helpingDictionary);
-                    // send response
-                    SendMessagesToClients(transferredArgs[0], handler);
-                    // close socket
-                    handler.Shutdown(SocketShutdown.Both);
-                    handler.Close();
-                }
+                        helpingDictionary.Add(transferredArgs[1], helpingList);
+
+                        _history.Add(Guid.NewGuid().ToString(), helpingDictionary);
+                        // send response
+                        SendMessagesToClients(transferredArgs[0], handler);
+                    }
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-            }
-
-            //IHubContext context = GlobalHost.ConnectionManager.GetHubContext<SimpleHub>();
-            //context.Clients.All.showPercent(percent);
-
-
-            //List<string> threadsToNotify = new List<string>();
-
-            //foreach (string key in _history.Keys)
-            //{
-            //    foreach (var innerDictionary in _history[key])
-            //    {
-            //        string currentThread = innerDictionary.Value.Select(x => x.thread).ToString();
-            //        if (!threadsToNotify.Contains(currentThread))
-            //        {
-            //            threadsToNotify.Add(currentThread);
-            //        }
-            //    }
-            //}
-
-            //foreach (string val in threadsToNotify)
-            //{
-            //    sendingData += "thread number : " + sendingThread + " sent message " + innerDictionary.Key + Environment.NewLine;
-            //}
+            catch (Exception ex){}
 
         }
 

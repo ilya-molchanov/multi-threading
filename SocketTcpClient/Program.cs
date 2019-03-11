@@ -28,94 +28,84 @@ namespace SocketTcpClient
 
         static void Main(string[] args)
         {
-            var cts = new CancellationTokenSource();
-            var token = cts.Token;
-            token.Register(() =>
+            Thread.Sleep(500);
+            using (CancellationTokenSource cts = new CancellationTokenSource())
             {
-                Console.WriteLine("Client Cancelled.");
-            });
+                var token = cts.Token;
+                token.Register(() => { Console.WriteLine("Client Cancelled."); });
 
-            Console.WriteLine("Press ESC to stop");
+                Console.WriteLine("Press ESC to stop");
 
-            while (!token.IsCancellationRequested)
-            {
-                if (Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Escape)
-                    cts.Cancel();
-                try
+                while (!token.IsCancellationRequested)
                 {
-                    Task.Run(() => { ClientSendMessages(token); }, token)
-                        .Wait(token);
-                }
-                catch (Exception e)
-                {
-                    cts.Dispose();
+                    if (Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Escape)
+                        cts.Cancel();
+                    try
+                    {
+                        Task.Run(() => { ClientSendMessages(token); }, token)
+                            .Wait(token);
+                    }
+                    catch (Exception e)
+                    {
+                        
+                    }
+
+                    
                 }
             }
 
             Console.Read();
         }
 
-        private static async Task ClientSendMessages(CancellationToken token)
+        private static void ClientSendMessages(CancellationToken token)
         {
-            try
+            for (int i = 0; i < GetRandomNumber(4, 5); i++)
             {
-                IPEndPoint ipPoint = new IPEndPoint(IPAddress.Parse(_address), _port);
-
-                
-                for (int i = 0; i < GetRandomNumber(4, 5); i++)
+                try
                 {
-                    using (Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
+                    IPEndPoint ipPoint = new IPEndPoint(IPAddress.Parse(_address), _port);
+                using (Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
+                {
+                    // connect to the remote host
+                    socket.Connect(ipPoint);
+                        
+                    string sendingMessage = _messagesList[GetRandomNumber(0, 9)];
+                    byte[] data =
+                        Encoding.Unicode.GetBytes(Thread.CurrentThread.ManagedThreadId + "|" + sendingMessage);
+                    socket.Send(data);
+
+                    // getting response
+                    data = new byte[10000]; // response buffer
+                    StringBuilder builder = new StringBuilder();
+                    int bytes = 0; // received bytes count
+
+                    do
                     {
-                        // connect to the remote host
-                        socket.Connect(ipPoint);
+                        bytes = socket.Receive(data, data.Length, 0);
+                        builder.Append(Encoding.Unicode.GetString(data, 0, bytes));
+                    } while (socket.Available > 0);
 
-                        //var res1 = CheckServerAvailability(socket);
-
-                        //if (!res1)
-                        //{
-                        //    socket.Close();
-                        //    socket.Dispose();
-                        //    return;
-                        //}
-
-                        string sendingMessage = _messagesList[GetRandomNumber(0, 9)];
-                        byte[] data =
-                            Encoding.Unicode.GetBytes(Thread.CurrentThread.ManagedThreadId + "|" + sendingMessage);
-                        socket.Send(data);
-
-                        // getting response
-                        data = new byte[10000]; // response buffer
-                        StringBuilder builder = new StringBuilder();
-                        int bytes = 0; // received bytes count
-
-                        do
-                        {
-                            bytes = socket.Receive(data, data.Length, 0);
-                            builder.Append(Encoding.Unicode.GetString(data, 0, bytes));
-                        } while (socket.Available > 0);
-
-                        if (builder.ToString() != string.Empty)
-                        {
-                            Console.WriteLine("client number: " + Thread.CurrentThread.ManagedThreadId +
-                                                " got server response: " +
-                                                builder.ToString());
-                        }
-
-                        // close socket
-                        socket.Shutdown(SocketShutdown.Both);
-                        socket.Close();
+                    if (builder.ToString() != string.Empty)
+                    {
+                        Console.WriteLine("client number: " + Thread.CurrentThread.ManagedThreadId +
+                                            " got server response: " +
+                                            builder.ToString());
                     }
+
+                    // close socket
+                    socket.Shutdown(SocketShutdown.Both);
+                    socket.Close();
+                }
+
+                }
+                catch (Exception ex)
+                {
+                    //Console.WriteLine(ex.Message);
+                    Console.WriteLine("Server Cancelled.");
+                    return;
                 }
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-            }
-            finally
-            {
-                
-            }
-            await Task.Delay(1000);
+            
         }
     }
 }
