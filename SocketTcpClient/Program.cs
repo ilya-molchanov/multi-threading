@@ -28,95 +28,92 @@ namespace SocketTcpClient
 
         static void Main(string[] args)
         {
-            Console.WriteLine("Press ESC to stop");
-           // ThreadPool.QueueUserWorkItem(state => CheckServerAvailability());
-            while (!(Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Escape))
+            var cts = new CancellationTokenSource();
+            var token = cts.Token;
+            token.Register(() =>
             {
-                ThreadPool.QueueUserWorkItem(state => ClientSendMessages(Thread.CurrentThread.ManagedThreadId));
-                ThreadPool.QueueUserWorkItem(state => ClientSendMessages(Thread.CurrentThread.ManagedThreadId));
+                Console.WriteLine("Client Cancelled.");
+            });
 
-                Thread.Sleep(3000);
+            Console.WriteLine("Press ESC to stop");
+
+            while (!token.IsCancellationRequested)
+            {
+                if (Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Escape)
+                    cts.Cancel();
+                try
+                {
+                    Task.Run(() => { ClientSendMessages(token); }, token)
+                        .Wait(token);
+                }
+                catch (Exception e)
+                {
+                    cts.Dispose();
+                }
             }
+
+            Console.Read();
         }
 
-        //private static bool CheckServerAvailability(Socket socket)
-        //{
-        //    bool success = socket.Poll(0, SelectMode.SelectRead);
-            //try
-            //{
-                //IPEndPoint ipPoint = new IPEndPoint(IPAddress.Parse(_address), _port);
-
-                //Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-                // connect to the remote host
-                
-                //if (success)
-                //{
-                //    return true;
-                //}
-                //else
-                //{
-                //    return false;
-                //}
-            //}
-            //catch (Exception ex)
-            //{
-            //    Console.WriteLine("2");
-            //    Console.WriteLine(ex.Message);
-            //}
-            //return false;
-        //}
-
-        private static async Task ClientSendMessages(int numberClient)
+        private static async Task ClientSendMessages(CancellationToken token)
         {
             try
             {
+                IPEndPoint ipPoint = new IPEndPoint(IPAddress.Parse(_address), _port);
+
+                
                 for (int i = 0; i < GetRandomNumber(4, 5); i++)
                 {
-                    IPEndPoint ipPoint = new IPEndPoint(IPAddress.Parse(_address), _port);
-
-                    Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-                    
-                    // connect to the remote host
-                    socket.Connect(ipPoint);
-
-                    //var res1 = CheckServerAvailability(socket);
-
-                    //if (!res1)
-                    //{
-                    //    socket.Close();
-                    //    socket.Dispose();
-                    //    return;
-                    //}
-
-                    string sendingMessage = _messagesList[GetRandomNumber(0, 9)];
-                    byte[] data = Encoding.Unicode.GetBytes(numberClient + "|" + sendingMessage);
-                    socket.Send(data);
-
-                    // getting response
-                    data = new byte[10000]; // response buffer
-                    StringBuilder builder = new StringBuilder();
-                    int bytes = 0; // received bytes count
-
-                    do
+                    using (Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
                     {
-                        bytes = socket.Receive(data, data.Length, 0);
-                        builder.Append(Encoding.Unicode.GetString(data, 0, bytes));
-                    } while (socket.Available > 0);
+                        // connect to the remote host
+                        socket.Connect(ipPoint);
 
-                    if (builder.ToString() != string.Empty)
-                    {
-                        Console.WriteLine("client number: " + numberClient + " got server response: " +
-                                          builder.ToString());
+                        //var res1 = CheckServerAvailability(socket);
+
+                        //if (!res1)
+                        //{
+                        //    socket.Close();
+                        //    socket.Dispose();
+                        //    return;
+                        //}
+
+                        string sendingMessage = _messagesList[GetRandomNumber(0, 9)];
+                        byte[] data =
+                            Encoding.Unicode.GetBytes(Thread.CurrentThread.ManagedThreadId + "|" + sendingMessage);
+                        socket.Send(data);
+
+                        // getting response
+                        data = new byte[10000]; // response buffer
+                        StringBuilder builder = new StringBuilder();
+                        int bytes = 0; // received bytes count
+
+                        do
+                        {
+                            bytes = socket.Receive(data, data.Length, 0);
+                            builder.Append(Encoding.Unicode.GetString(data, 0, bytes));
+                        } while (socket.Available > 0);
+
+                        if (builder.ToString() != string.Empty)
+                        {
+                            Console.WriteLine("client number: " + Thread.CurrentThread.ManagedThreadId +
+                                                " got server response: " +
+                                                builder.ToString());
+                        }
+
+                        // close socket
+                        socket.Shutdown(SocketShutdown.Both);
+                        socket.Close();
                     }
-
-                    // close socket
-                    socket.Shutdown(SocketShutdown.Both);
-                    socket.Close();
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex.Message);
+            }
+            finally
+            {
+                
             }
             await Task.Delay(1000);
         }
