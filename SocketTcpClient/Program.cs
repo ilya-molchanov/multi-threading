@@ -39,12 +39,8 @@ namespace SocketTcpClient
                 {
                     if (Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Escape)
                         cts.Cancel();
-                    try
-                    {
-                        Task.Run(() => { ClientSendMessages(token); }, token)
-                            .Wait(token);
-                    }
-                    catch (Exception e){}
+                    
+                    Task.Run(() => { ClientSendMessages(token); }, token);
                 }
             }
 
