@@ -15,14 +15,13 @@ namespace SocketTcpClient
 
         public static int GetRandomNumber(int min, int max)
         {
-            lock (_getrandom) // synchronize
-            {
-                return _getrandom.Next(min, max);
-            }
+            return _getrandom.Next(min, max);
         }
 
         private static readonly int _port = 8005; // server _port
         private static readonly string _address = "127.0.0.1"; // server _address
+        private static readonly int _minRandom = 3;
+        private static readonly int _maxRandom = 5;
 
         private static List<string> _messagesList = new List<string>() {"first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eigth", "nineth", "tenth" };
 
@@ -45,12 +44,7 @@ namespace SocketTcpClient
                         Task.Run(() => { ClientSendMessages(token); }, token)
                             .Wait(token);
                     }
-                    catch (Exception e)
-                    {
-                        
-                    }
-
-                    
+                    catch (Exception e){}
                 }
             }
 
@@ -59,7 +53,7 @@ namespace SocketTcpClient
 
         private static void ClientSendMessages(CancellationToken token)
         {
-            for (int i = 0; i < GetRandomNumber(4, 5); i++)
+            for (int i = 0; i < GetRandomNumber(_minRandom, _maxRandom); i++)
             {
                 try
                 {
